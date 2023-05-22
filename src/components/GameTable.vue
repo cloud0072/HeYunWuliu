@@ -27,28 +27,34 @@
       <div class="game-option">
         <div class="panel-option">
           <div class="action-option-title">罗盘状态</div>
-          <a-form-item label="当前位置">
+          <a-form-item>
+            <template #label>
+              <div class="item-label">
+                <div class="action-option-prefix"></div>
+                当前位置
+              </div>
+            </template>
             <a-row :gutter="8">
               <a-col span="6">
                 <a-select
-                    style="width: 100%"
-                    v-model:value="table.circle1"
+                    @select="e => onSelect('circle1', e)"
+                    :value="table.circle1 % 360"
                     :options="degOptions.filter((v,i)=> i>4)"
                     placeholder="请选择转动角度-外圈"
                 />
               </a-col>
               <a-col span="6">
                 <a-select
-                    style="width: 100%"
-                    v-model:value="table.circle2"
+                    @select="e => onSelect('circle2', e)"
+                    :value="table.circle2 % 360"
                     :options="degOptions.filter((v,i)=> i>4)"
                     placeholder="请选择转动角度-中圈"
                 />
               </a-col>
               <a-col span="6">
                 <a-select
-                    style="width: 100%"
-                    v-model:value="table.circle3"
+                    @select="e => onSelect('circle3', e)"
+                    :value="table.circle3 % 360"
                     :options="degOptions.filter((v,i)=> i>4)"
                     placeholder="请选择转动角度-内圈"
                 />
@@ -68,13 +74,16 @@
           <template v-for="(item, index) in actions" :key="index">
             <a-form-item>
               <template #label>
-                <div class="action-option-prefix">{{ actionIndex === index ? '>' : '' }}</div>
-                {{ item.name }}
+                <div class="item-label">
+                  <div class="action-option-prefix">
+                    <right-circle-outlined v-if="actionIndex === index"/>
+                  </div>
+                  {{ item.name }}
+                </div>
               </template>
               <a-row :gutter="8">
                 <a-col span="6">
                   <a-select
-                      style="width: 100%"
                       v-model:value="item.circle1"
                       :options="degOptions"
                       placeholder="请选择转动角度-外圈"
@@ -82,7 +91,6 @@
                 </a-col>
                 <a-col span="6">
                   <a-select
-                      style="width: 100%"
                       v-model:value="item.circle2"
                       :options="degOptions"
                       placeholder="请选择转动角度-中圈"
@@ -90,7 +98,6 @@
                 </a-col>
                 <a-col span="6">
                   <a-select
-                      style="width: 100%"
                       v-model:value="item.circle3"
                       :options="degOptions"
                       placeholder="请选择转动角度-内圈"
@@ -114,21 +121,28 @@
         </div>
       </div>
       <div class="game-resolve">
-
+        <div class="action-option-title">推荐解法</div>
+        <div class="action-resolve-list">
+          <div v-if="solution.length === 0"> 当前情况下无解</div>
+          <div class="action-item" v-for="(item, i) in solution" :key="i">
+            {{ actions[i].name }}: {{ item }} 次
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import {reactive, ref, toRefs} from "vue";
-import {DeleteOutlined, PlusOutlined} from '@ant-design/icons-vue';
+import {reactive, ref, toRefs, watch} from "vue";
+import {DeleteOutlined, PlusOutlined, RightCircleOutlined} from '@ant-design/icons-vue';
 
 export default {
   name: "GameTable",
   components: {
     PlusOutlined,
-    DeleteOutlined
+    DeleteOutlined,
+    RightCircleOutlined
   },
   setup() {
     const state = reactive({
@@ -140,7 +154,13 @@ export default {
         circle2: 0,
         circle3: 0,
       },
+      solution: []
     })
+
+    const onSelect = (key, e) => {
+      console.log('on select', e)
+      state.table[key] = e
+    }
 
     // 动作列表
     const actions = ref([
@@ -148,6 +168,18 @@ export default {
       {name: 'Action2', circle1: 0, circle2: 60, circle3: 0},
       {name: 'Action3', circle1: 0, circle2: 0, circle3: 60},
     ])
+
+    watch(actions.value, nv => {
+      console.log('actions.value', nv)
+      resolveAction()
+    });
+
+    watch(state.table, nv => {
+      console.log('state.table', nv)
+      resolveAction()
+    }, {
+      deep: true
+    })
 
     const autoIncrement = ref(actions.value.length + 1);
 
@@ -157,9 +189,7 @@ export default {
     })
 
     const handleAdd = () => {
-      actions.value.push(
-          {name: 'Action' + autoIncrement.value++, circle1: 0, circle2: 0, circle3: 0},
-      )
+      actions.value.push({name: 'Action' + autoIncrement.value++, circle1: 0, circle2: 0, circle3: 0})
     }
 
     const handleDelete = (index) => {
@@ -182,55 +212,104 @@ export default {
     const applyAction = () => {
       const {circle1, circle2, circle3} = state.table;
       const action = actions.value[state.actionIndex]
-      state.table = {
-        circle1: (circle1 + action.circle1),
-        circle2: (circle2 + action.circle2),
-        circle3: (circle3 + action.circle3),
-      }
+      state.table.circle1 = (circle1 + action.circle1);
+      state.table.circle2 = (circle2 + action.circle2);
+      state.table.circle3 = (circle3 + action.circle3);
     }
 
     // 求解
     // 1 求解时 Action的先后次序不影响结果，求取最优解时 设最优解需要0-X步，枚举X步有多少种不同的Action组合，无解则X+1，有解则返回
     // 2 若 位置 % 360 = 0 则为正确位置
     const resolveAction = () => {
-      // 尝试 50 次
-      const times = 50;
-      // 获取初始状态
-      const { circle1, circle2, circle3 } = state.table;
-      for (let i = 0; i < times; i++) {
-
+      try {
+        state.solution = []
+        // 尝试 50 次
+        getSolutions(actions.value.length, 50);
+      } catch (error) {
+        const result = JSON.parse(error.message);
+        state.solution = result;
+        console.log('result:', result)
       }
     }
 
-    // actions种操作, 转动times次, 有多少种不通转动方式
-    // 例 3种操作 转动4次
     /**
+     * actions种操作, 转动times次, 有多少种不通转动方式
+     * acions = 3 时
+     * times = 0
      * [
-     * {a1: 4, a2: 0, a3: 0, a4: 0}
-     * {a1: 3, a2: 1, a3: 0, a4: 0}
-     * {a1: 3, a2: 0, a3: 1, a4: 0}
-     * {a1: 3, a2: 0, a3: 0, a4: 1}
-     * {a1: 2, a2: 2, a3: 0, a4: 0}
-     * {a1: 2, a2: 0, a3: 2, a4: 0}
-     * {a1: 2, a2: 0, a3: 0, a4: 2}
-     * {a1: 2, a2: 1, a3: 1, a4: 0}
-     * {a1: 2, a2: 1, a3: 0, a4: 1}
-     * {a1: 2, a2: 0, a3: 1, a4: 1}
+     *  [0,0,0]
+     * ]
+     * times = 1
+     * [
+     *  [1,0,0],
+     *  [0,1,0],
+     *  [0,0,1]
+     * ]
+     * times = 2
+     * [
+     *  [2,0,0],
+     *  [1,1,0],
+     *  [0,1,2],
+     *
+     *  [1,1,0],
+     *  [0,2,0],
+     *  [0,1,1],
+     *
+     *  [1,0,1]
+     *  [0,2,1]
+     *  [0,0,2]
      * ]
      */
-    const genStepList = (actions, times) => {
-
+    const getSolutions = (len = 0, times) => {
+      if (times >= 1) {
+        const actionList = getSolutions(len, times - 1);
+        const set = new Set(); // 去重
+        for (let i = 0; i < actionList.length; i++) {
+          for (let j = 0; j < actionList[i].length; j++) {
+            const list = [...actionList[i]];
+            list[j] = list[j] + 1
+            if (validSolution(list)) {
+              throw new Error(JSON.stringify(list))
+            }
+            set.add(JSON.stringify(list))
+          }
+        }
+        const result = [...set].map(s => JSON.parse(s));
+        // console.log(`len: ${len} times: ${times}`, result);
+        console.log(`len: ${len} times: ${times}`);
+        return result;
+      }
+      // init
+      const list = new Array(len).fill(0);
+      if (validSolution(list)) {
+        throw new Error(JSON.stringify(list))
+      }
+      return [list];
     }
+
+    const validSolution = (array) => {
+      // 获取初始状态
+      const {circle1, circle2, circle3} = state.table;
+      const initState = {circle1, circle2, circle3};
+      return Object.keys(initState)
+          .map(key => initState[key] + array.map((t, i) => actions.value[i][key] * t).reduce((pv, cv) => pv + cv, 0))
+          .filter(deg => deg % 360 === 0).length === 3
+    }
+
+    // create
+    resolveAction()
 
     return {
       ...toRefs(state),
       actions,
       degOptions,
+      onSelect,
       applyAction,
       switchAction,
       isActive,
       handleAdd,
-      handleDelete
+      handleDelete,
+      resolveAction
     }
   }
 }
@@ -311,7 +390,7 @@ export default {
 
 .circle-flag {
   position: absolute;
-  width: calc(2 * @width - 4px);
+  width: calc(2 * @width - 10px);
   height: 4px;
   top: 50%;
   transform: translateX(-50%) translateY(-50%);
@@ -386,9 +465,11 @@ export default {
 .panel-option {
   //margin-top: 20px;
 }
+
 .btn-option {
   margin-top: 20px;
 }
+
 .action-option {
   width: 600px;
   margin-top: 20px;
@@ -400,9 +481,20 @@ export default {
   }
 
   &-prefix {
-    width: 10px;
+    margin-right: 4px;
+    line-height: 32px;
     color: #f23d3d;
     font-weight: 700;
+    text-align: center;
   }
+}
+.item-label {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 72px;
+}
+.game-resolve {
+  margin-left: 40px;
 }
 </style>
