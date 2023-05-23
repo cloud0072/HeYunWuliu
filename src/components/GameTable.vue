@@ -67,11 +67,37 @@
           <a-space>
             <a-button type="primary" @click="applyAction">旋转轮盘</a-button>
             <a-button type="primary" @click="switchAction">切换动作</a-button>
+            <a-button @click="handleAdd" type="primary">
+              <plus-outlined/>
+              新增动作
+            </a-button>
           </a-space>
         </div>
         <div class="action-option">
           <div class="action-option-title">动作配置</div>
           <template v-for="(item, index) in actions" :key="index">
+            <a-form-item v-if="index === 0">
+              <template #label>
+                <div class="item-label">
+                  <div class="action-option-prefix"></div>
+                  名称
+                </div>
+              </template>
+              <a-row :gutter="8">
+                <a-col span="6">
+                  <div style="text-align: center">外圈</div>
+                </a-col>
+                <a-col span="6">
+                  <div style="text-align: center">中圈</div>
+                </a-col>
+                <a-col span="6">
+                  <div style="text-align: center">内圈</div>
+                </a-col>
+                <a-col span="6">
+                  <div style="text-align: center">操作</div>
+                </a-col>
+              </a-row>
+            </a-form-item>
             <a-form-item>
               <template #label>
                 <div class="item-label">
@@ -103,21 +129,17 @@
                       placeholder="请选择转动角度-内圈"
                   />
                 </a-col>
-                <a-col span="4">
-                  <a-space>
-                    <a-button @click="handleDelete(index)" type="primary" danger>
+                <a-col span="6">
+                  <div style="text-align: center">
+                    <a-button @click="handleDelete(index)" type="link" danger>
                       <delete-outlined/>
                       删除
                     </a-button>
-                  </a-space>
+                  </div>
                 </a-col>
               </a-row>
             </a-form-item>
           </template>
-          <a-button @click="handleAdd" type="primary">
-            <plus-outlined/>
-            新增Action
-          </a-button>
         </div>
       </div>
       <div class="game-resolve">
@@ -150,9 +172,9 @@ export default {
       actionIndex: 0,
       // 轮盘角度
       table: {
-        circle1: 0,
-        circle2: 0,
-        circle3: 0,
+        circle1: 60,
+        circle2: 120,
+        circle3: 180,
       },
       solution: []
     })
@@ -496,5 +518,8 @@ export default {
 }
 .game-resolve {
   margin-left: 40px;
+}
+.action-item {
+  margin-bottom: 20px;
 }
 </style>
